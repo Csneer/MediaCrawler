@@ -306,3 +306,66 @@ Thordata：可靠且经济高效的代理服务提供商。为企业和开发者
 ## 6. 最终解释权
 关于本项目的最终解释权归开发者所有。开发者保留随时更改或更新本免责声明的权利，恕不另行通知。
 </div>
+
+## 🛰️ 抖音指定作品最新评论监控子系统（新增）
+
+本次新增了独立的 `monitor/` 子系统（不影响原有 `search/detail/crawler` 主流程），用于“指定抖音作品最新评论轮询监控”。当前版本仅实现 `douyin`，并预留了 `xiaohongshu` 扩展接口。
+
+### 功能特性
+- 支持单目标 CLI 启动，或通过配置文件同时监控多个目标。
+- 复用项目 Playwright 浏览器初始化与登录态缓存逻辑，优先走已有登录会话。
+- 每个目标按独立间隔轮询评论区，优先尝试切换“最新评论”。
+- 评论去重持久化到 SQLite（`monitor_comments.comment_key` 唯一约束）。
+- 新评论写入事件表，并支持 webhook JSON 通知。
+- 轮询失败自动恢复（连续失败后重建页面）。
+
+### 目录
+- `monitor/models.py`：监控模型、目标模型、comment_key 生成。
+- `monitor/storage.py`：SQLite 建表、目标/评论/事件持久化。
+- `monitor/notifier.py`：Webhook 通知（失败不阻断主流程）。
+- `monitor/scheduler.py`：按目标周期调度轮询。
+- `monitor/manager.py`：任务编排、去重写入、通知、恢复。
+- `monitor/platforms/douyin.py`：`DouyinCommentMonitor` 实现。
+- `monitor/platforms/xiaohongshu.py`：扩展 stub（暂未实现）。
+- `run_monitor.py`：独立入口。
+
+### 使用前准备
+1. 先按项目原有流程完成抖音登录态（`SAVE_LOGIN_STATE=True`，浏览器缓存有效）。
+2. 安装依赖（新增 `PyYAML` 用于读取 YAML 配置）。
+
+```bash
+pip install -r requirements.txt
+```
+
+### 启动方式
+
+#### 方式 1：命令行单目标
+```bash
+python run_monitor.py --platform douyin --url "https://www.douyin.com/video/7525082444551310602" --interval 60 --max-comments 30
+```
+
+#### 方式 2：配置文件多目标
+```bash
+python run_monitor.py --config config/monitor_douyin.example.yaml
+```
+
+### 常用参数
+- `--platform`：当前仅支持 `douyin`
+- `--url` / `--target-id`：作品链接或作品 ID
+- `--interval`：轮询间隔（秒）
+- `--fetch-replies`：是否抓取二级评论（默认关闭）
+- `--webhook`：可选 webhook 地址
+- `--config`：YAML 配置文件路径
+- `--db-path`：SQLite 文件路径（默认 `data/monitor.db`）
+
+### 数据库存储
+默认数据库：`data/monitor.db`
+- `monitor_targets`：监控目标与状态
+- `monitor_comments`：去重后的评论数据
+- `monitor_events`：新增评论事件
+
+### 已知限制
+- 抖音评论区 DOM 结构变化可能导致选择器失效。
+- “最新评论”按钮可能在不同版本页面位置或文案不同。
+- 二级评论为可选能力，首版仅对可见回复做 best-effort 抓取。
+- 必须具备有效登录态，否则会触发登录流程。
