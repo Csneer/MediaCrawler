@@ -1,0 +1,30 @@
+database:
+  path: data/monitor.db
+
+monitor:
+  # Default polling interval for targets that do not specify check_interval_sec
+  default_interval_sec: 60
+  # Number of top comments fetched each round
+  max_comments_per_round: 30
+  # Max replies fetched under each parent comment (reserved, first release is best-effort)
+  max_reply_comments_per_round: 5
+  log_level: INFO
+  recovery:
+    # Re-open target page after N consecutive failures
+    rebuild_page_after_failures: 3
+    # Reserved for future backoff strategy
+    cooldown_after_failures: 10
+
+notification:
+  # Optional webhook receiving json post payload
+  webhook_url: ""
+
+targets:
+  - platform: douyin
+    target_url: "https://www.douyin.com/video/7525082444551310602"
+    # target_id can be omitted for douyin url, monitor runner will parse it automatically
+    enabled: true
+    check_interval_sec: 60
+    fetch_reply_comments: false
+    max_comments_per_round: 30
+    max_reply_comments_per_round: 5
